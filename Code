@@ -1,0 +1,173 @@
+package ai.astar_search
+
+import utils.Solution
+
+import scala.annotation.tailrec
+import scala.util.Try
+
+object PacManDFS extends Solution {
+
+  def main(args: Array[String]): Unit = {
+    implicit val sc = new java.util.Scanner(System.in)
+
+    val startPos = Pos.read
+    val foodPos = Pos.read
+    val board = Board.create
+
+
+
+    val dfs = DepthFirstSearch(board)
+
+    //    println(board)
+
+    println(dfs.explored.size)
+    println(dfs.explored.mkString("\n"))
+    println(dfs.path.size - 1)
+    println(dfs.path.mkString("\n"))
+
+  }
+
+  trait SpriteType {
+    val symbol = '?'
+  }
+
+
+  case class DepthFirstSearch(board: Board) {
+
+    lazy val explored = {
+
+      @tailrec
+      def traverse(toVisit: List[Pos], visitedPos: List[Pos]): Option[List[Pos]] = toVisit.headOption match {
+        case None => None
+        case Some(pos) => {
+          if (board.checkTarget(pos)) Some(pos :: visitedPos)
+          else {
+            val nextMoves = board
+              .validMoves(pos)
+              .diff(visitedPos)
+
+            //            traverse(toVisit.tail ++ nextMoves, pos :: visitedPos) // BFS
+            traverse(nextMoves ++ toVisit.tail, pos :: visitedPos) // DFS
+          }
+        }
+      }
+
+      traverse(board.start.pos :: Nil, Nil)
+        .getOrElse(Nil)
+        .reverse
+    }
+
+
+    lazy val path = {
+      def traverse(pos: Pos, path: List[Pos]): List[Pos] = {
+        if (board.checkTarget(pos)) pos :: path
+        else {
+          val nextMoves = board
+            .validMoves(pos)
+            .diff(path).toIterator
+
+
+          nextMoves.map(traverse(_, pos :: path)).dropWhile(_.isEmpty).take(1).flatten.toList
+        }
+      }
+
+
+      traverse(board.start.pos, Nil).reverse
+    }
+
+
+  }
+
+
+
+  case class Board(rows: Int, cols: Int, grid: List[List[Sprite]]) {
+
+    override def toString = {
+      println(s"M [$rows x $cols]")
+      grid.map(_.mkString("")).mkString("\n")
+    }
+
+    def start = findSprites(PacMan).head
+
+    def findSprites(spriteType: SpriteType): List[Sprite] = {
+      grid.flatMap(_.filter(_.spriteType == spriteType))
+    }
+
+    def target = findSprites(Food).head
+
+    def checkTarget(pos: Pos): Boolean = spriteAt(pos).exists(_.spriteType == Food)
+
+    def validMoves(pos: Pos): List[Pos] = {
+      val down = Pos(pos.row + 1, pos.col)
+      val right = Pos(pos.row, pos.col + 1)
+      val left = Pos(pos.row, pos.col - 1)
+      val up = Pos(pos.row - 1, pos.col)
+
+      List(down, right, left, up)
+        .flatMap(spriteAt)
+        .filter(_.spriteType != Wall)
+        .map(_.pos)
+    }
+
+    def spriteAt(pos: Pos): Option[Sprite] = Try(grid(pos.row)(pos.col)).toOption
+  }
+
+  case class Sprite(spriteType: SpriteType, pos: Pos) {
+    override def toString = spriteType.symbol.toString
+  }
+
+  case class Pos(row: Int, col: Int) {
+    override def toString = s"$row $col"
+  }
+
+  object Board {
+    def create(implicit sc: java.util.Scanner): Board = {
+      val rows = sc.nextInt()
+      val cols = sc.nextInt()
+
+      val lines = (0 until rows).map(x => sc.next().trim.substring(0, cols).toCharArray.zipWithIndex).zipWithIndex
+
+      val grid: List[List[Sprite]] = lines.map {
+        case (line, row) => line.map {
+          case (ch, col) => Sprite(ch, row, col)
+        }.toList
+      }.toList
+
+      Board(rows, cols, grid)
+
+    }
+  }
+
+  object Sprite {
+    def apply(ch: Char, row: Int, col: Int): Sprite = ch match {
+      case Wall.symbol => Sprite(Wall, Pos(row, col))
+      case Corridor.symbol => Sprite(Corridor, Pos(row, col))
+      case Food.symbol => Sprite(Food, Pos(row, col))
+      case PacMan.symbol => Sprite(PacMan, Pos(row, col))
+    }
+  }
+
+  object Wall extends SpriteType {
+    override val symbol = '%'
+  }
+
+  object Corridor extends SpriteType {
+    override val symbol = '-'
+  }
+
+
+  object Food extends SpriteType {
+    override val symbol = '.'
+  }
+
+  object PacMan extends SpriteType {
+    override val symbol = 'P'
+  }
+
+  object Pos {
+    def read(implicit sc: java.util.Scanner): Pos = {
+      Pos(sc.nextInt(), sc.nextInt())
+    }
+  }
+
+}
